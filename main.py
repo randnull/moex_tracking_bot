@@ -15,7 +15,7 @@ import time
 import requests
 import json
 
-bot = Bot(token='')
+bot = Bot(token='5830042426:AAGw0KXukzk1Q-cBQi_1wEGhRAqAXhQyhlA')
 dp = Dispatcher(bot, storage=MemoryStorage())
 
 engine = db.create_engine('sqlite+pysqlite:///database.db', echo=True)
@@ -61,9 +61,9 @@ async def yandex(message):
     while True:
         url = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350'
         response = requests.get(url)
-        price = "1000"
-        #answer = json.loads(response.text)
-        #price = str(answer["securities"]["data"][243][0]) + " " + str(answer["securities"]["data"][243][22])
+        #price = "1000"
+        answer = json.loads(response.text)
+        price = str(answer["securities"]["data"][243][0]) + " " + str(answer["securities"]["data"][243][22])
         await message.answer(price)
         time.sleep(10)
 
