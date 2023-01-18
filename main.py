@@ -10,14 +10,12 @@ from sqlalchemy.ext.declarative import *
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
 
-import time
-
 import requests
 import json
 
 from sqlalchemy.util import asyncio
 
-bot = Bot(token='________________')
+bot = Bot(token='____________________________')
 url_moex = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350'
 dp = Dispatcher(bot, storage=MemoryStorage())
 
@@ -180,7 +178,7 @@ def check(response, name):
     if abs(ret_val) > 0:
         db = sqlite3.connect('database.db')
         sql = db.cursor()
-        sql.execute(f"INSERT OR REPLACE INTO persons (Name, Price, Index) VALUES ({name}, '{new_price}', '{index}'")
+        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index") VALUES (?, ?, ?)', (name, new_price, index))
         db.commit()
         session.commit()
     return price, new_price
@@ -198,19 +196,18 @@ async def process(message):
     person_actions = person_actions.split()
     await message.answer('\n'.join(person_actions))
     while True:
-        response = requests.get(url_moex)
-        print(1)
+        response = requests.get("https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
         for action in person_actions:
             price, new_price = check(response, action)
-            print(price, new_price)
             difference = price - new_price
-            res = 'Nothing'
+            res = ''
             if difference > 0:
-                res = '📈'
-            elif difference < 0:
                 res = '📉'
-            text = f"{res}{action}: {price} -> {new_price} {res}"
-            await message.reply(text)
+            elif difference < 0:
+                res = '📈'
+            if len(res) > 0:
+                text = f"{res}{action}: {price} -> {new_price} {res}"
+                await message.reply(text)
         await asyncio.sleep(10)
 
 if __name__ == "__main__":
