@@ -15,7 +15,7 @@ import json
 
 from sqlalchemy.util import asyncio
 
-bot = Bot(token='____________________________')
+bot = Bot(token='___________________')
 url_moex = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350'
 dp = Dispatcher(bot, storage=MemoryStorage())
 
@@ -25,6 +25,7 @@ Base = declarative_base()
 Session = sessionmaker(bind=engine, future=True, expire_on_commit=False)
 session = Session()
 
+not_stop = True
 
 class Persons(Base):
     __tablename__ = 'persons'
@@ -71,7 +72,6 @@ put_companies_to_table()
 class Actions(StatesGroup):
     ChooseCompany = State()
 
-
 @dp.message_handler(commands=['start'], state="*")
 async def start(message):
     user_id = message.from_user.id
@@ -96,6 +96,9 @@ async def help(message):
 
 @dp.message_handler(lambda message: message.text == "Изменить акции для отслеживания", state="*")
 async def choose_action(message):
+    global not_stop
+    not_stop = False
+    await message.answer("Вы остановили отслеживание. Для получения списка команд нажмите /help")
     await Actions.ChooseCompany.set()
     user_id = message.from_user.id
     companies = session.query(Companies).all()
@@ -184,8 +187,16 @@ def check(response, name):
     return price, new_price
 
 
+@dp.message_handler(lambda message: message.text == "Остановить отслеживание", state="*")
+async def stop(message, state):
+    global not_stop
+    not_stop = False
+    await message.answer("Вы остановили отслеживание. Для получения списка команд нажмите /help")
+
+
 @dp.message_handler(lambda message: message.text == "Перейти к отслеживанию", state="*")
 async def process(message):
+    global not_stop
     user_id = message.from_user.id
     person_actions = session.query(Persons).filter_by(UserID=user_id).first().Companies
     if person_actions is None or person_actions == '':
@@ -194,8 +205,12 @@ async def process(message):
         return
     await message.answer("Мы отслеживаем следующие акции:")
     person_actions = person_actions.split()
-    await message.answer('\n'.join(person_actions))
-    while True:
+    not_stop = True
+    create = KeyboardButton("Остановить отслеживание")
+    buttons = ReplyKeyboardMarkup(resize_keyboard=True)
+    buttons.add(create)
+    await message.answer('\n'.join(person_actions), reply_markup=buttons)
+    while not_stop:
         response = requests.get("https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
         for action in person_actions:
             price, new_price = check(response, action)
@@ -205,7 +220,7 @@ async def process(message):
                 res = '📉'
             elif difference < 0:
                 res = '📈'
-            if len(res) > 0:
+            if len(res) >= 0:
                 text = f"{res}{action}: {price} -> {new_price} {res}"
                 await message.reply(text)
         await asyncio.sleep(10)
