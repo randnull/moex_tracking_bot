@@ -15,7 +15,9 @@ import time
 import requests
 import json
 
-bot = Bot(token='___________________________')
+from sqlalchemy.util import asyncio
+
+bot = Bot(token='________________')
 url_moex = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350'
 dp = Dispatcher(bot, storage=MemoryStorage())
 
@@ -74,7 +76,8 @@ class Actions(StatesGroup):
 
 @dp.message_handler(commands=['start'], state="*")
 async def start(message):
-    results = session.query(Persons).all()
+    user_id = message.from_user.id
+    results = session.query(Persons).filter_by(UserID=user_id).all()
     await message.answer("Добро пожаловать! Для просмотра команд введите /help")
     if len(results) > 0:
         return
@@ -208,7 +211,7 @@ async def process(message):
                 res = '📉'
             text = f"{res}{action}: {price} -> {new_price} {res}"
             await message.reply(text)
-        time.sleep(10)
+        await asyncio.sleep(10)
 
 if __name__ == "__main__":
     executor.start_polling(dp)
