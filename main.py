@@ -1,3 +1,6 @@
+import asyncio
+
+import toml
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
@@ -6,16 +9,21 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 
 import sqlalchemy as db
 import sqlite3
-from sqlalchemy.ext.declarative import *
 from sqlalchemy import *
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 import requests
 import json
 
-from sqlalchemy.util import asyncio
+with open("bot_config.toml",  "r",) as config_file:
+    config_toml = toml.load(config_file)
+    try:
+        token: str = config_toml["bot"]["token"]
+    except Exception:
+        raise AttributeError('Config file does not have token properly defined.')
 
-bot = Bot(token='___________________')
+bot = Bot(token=token)
 url_moex = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350'
 dp = Dispatcher(bot, storage=MemoryStorage())
 
@@ -26,6 +34,7 @@ Session = sessionmaker(bind=engine, future=True, expire_on_commit=False)
 session = Session()
 
 not_stop = True
+
 
 class Persons(Base):
     __tablename__ = 'persons'
@@ -72,6 +81,7 @@ put_companies_to_table()
 class Actions(StatesGroup):
     ChooseCompany = State()
 
+
 @dp.message_handler(commands=['start'], state="*")
 async def start(message):
     user_id = message.from_user.id
@@ -116,8 +126,8 @@ async def choose_action(message):
         all_actions += '\n'
     await message.answer(all_actions)
     await message.answer("Вы можете:\n"
-                   "Ввести акцию из списка ваших акций, если хотите удалить ее из вашего списка отслеживания.\n"
-                   "Ввести акцию из списка доступных акций, если хотите добавить ее в ваш список отслеживания.")
+                         "Ввести акцию из списка ваших акций, если хотите удалить ее из вашего списка отслеживания.\n"
+                         "Ввести акцию из списка доступных акций, если хотите добавить ее в ваш список отслеживания.")
 
 
 @dp.message_handler(state=Actions.ChooseCompany)
@@ -159,7 +169,8 @@ async def choose_company(message, state):
             sql.execute('INSERT OR REPLACE INTO persons ("UserID", "Companies") VALUES (?, ?)', (user_id, companies_str))
             db.commit()
             session.commit()
-            await message.answer("Акция успешно добавлена. Введите название другой акции, которую хотите добавить/удалить, или нажмите Выйти.", reply_markup=buttons)
+            await message.answer("Акция успешно добавлена. Введите название другой акции, которую хотите добавить/удалить, или нажмите Выйти.",
+                                 reply_markup=buttons)
         person_actions = session.query(Persons).filter_by(UserID=user_id).first().Companies.split()
         await message.answer("Акции, которые вы отслеживаете:")
         await message.answer('\n'.join(person_actions))
@@ -211,19 +222,23 @@ async def process(message):
     buttons.add(create)
     await message.answer('\n'.join(person_actions), reply_markup=buttons)
     while not_stop:
-        response = requests.get("https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
-        for action in person_actions:
-            price, new_price = check(response, action)
-            difference = price - new_price
-            res = ''
-            if difference > 0:
-                res = '📉'
-            elif difference < 0:
-                res = '📈'
-            if len(res) >= 0:
-                text = f"{res}{action}: {price} -> {new_price} {res}"
-                await message.reply(text)
-        await asyncio.sleep(10)
+        try:
+            response = requests.get("https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
+            for action in person_actions:
+                price, new_price = check(response, action)
+                difference = price - new_price
+                res = ''
+                if difference > 0:
+                    res = '📉'
+                elif difference < 0:
+                    res = '📈'
+                if len(res) > 0:
+                    text = f"{res}{action}: {price} -> {new_price} {res}"
+                    await message.reply(text)
+        except:
+            print("error")
+        await asyncio.sleep(60)
+
 
 if __name__ == "__main__":
     executor.start_polling(dp)
