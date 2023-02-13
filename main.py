@@ -16,6 +16,10 @@ from sqlalchemy.orm import sessionmaker
 import requests
 import json
 
+import yfinance
+import math
+import numpy
+
 with open("bot_config.toml",  "r",) as config_file:
     config_toml = toml.load(config_file)
     try:
@@ -182,6 +186,10 @@ def get_price(response, name):
     price_active = 22
     return answer["securities"]["data"][index][price_active]
 
+def get_volume(ticker):
+    stock_info = yfinance.Ticker(ticker)
+    volume = (stock_info.fast_info.last_volume)
+    return volume
 
 def check(response, name):
     new_price = get_price(response, name)
@@ -223,6 +231,29 @@ async def process(message):
     await message.answer('\n'.join(person_actions), reply_markup=buttons)
     while not_stop:
         try:
+            response = requests.get(
+                "https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
+            for action in person_actions:
+                volume = get_volume(action)
+                last_volume = 0
+                difference_v = (abs(volume - last_volume) * 100) / (volume + 0.001)
+                if (abs(difference_v) > 0.05):
+                    mes_v = "🟢Резкое увеличение объема"
+                    await message.reply(mes_v)
+                price, new_price = check(response, action)
+                difference = (abs(price - new_price) * 100) / (price + 0.001) * numpy.sign(-price + new_price)
+                if difference > 0:
+                    mes = f"🟢#{action}\n"
+                elif difference < 0:
+                    mes = f"🔴#{action}\n"
+                if abs(difference) > 0.005:
+                    if abs(difference) > 0.01:
+                        mes += "Резкое изменения цены\n"
+                    else:
+                        mes += "Изменение цены\n"
+                if len(mes) > 0:
+                    answer = f"{mes}{action}: {price} -> {new_price} {mes} ({difference * 100}%)"
+                    await message.reply(answer)
             response = requests.get("https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
             for action in person_actions:
                 price, new_price = check(response, action)
