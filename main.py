@@ -186,10 +186,10 @@ def get_price(response, name):
     price_active = 22
     return answer["securities"]["data"][index][price_active]
 
-def get_volume(ticker):
-    stock_info = yfinance.Ticker(ticker)
-    volume = (stock_info.fast_info.last_volume)
-    return volume
+# def get_volume(ticker):
+#     stock_info = yfinance.Ticker(ticker)
+#     volume = stock_info.fast_info
+#     return volume
 
 def check(response, name):
     new_price = get_price(response, name)
@@ -234,12 +234,13 @@ async def process(message):
             response = requests.get(
                 "https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
             for action in person_actions:
-                volume = get_volume(action)
-                last_volume = 0
-                difference_v = (abs(volume - last_volume) * 100) / (volume + 0.001)
-                if (abs(difference_v) > 0.05):
-                    mes_v = "🟢Резкое увеличение объема"
-                    await message.reply(mes_v)
+                # volume = get_volume(action)
+                # last_volume = 0
+                # difference_v = (abs(volume - last_volume) * 100) / (volume + 0.001)
+                # if (abs(difference_v) > 0.05):
+                #     last_volume = volume
+                #     mes_v = "🟢Резкое увеличение объема"
+                #     await message.reply(mes_v)
                 price, new_price = check(response, action)
                 difference = (abs(price - new_price) * 100) / (price + 0.001) * numpy.sign(-price + new_price)
                 if difference > 0:
@@ -254,18 +255,6 @@ async def process(message):
                 if len(mes) > 0:
                     answer = f"{mes}{action}: {price} -> {new_price} {mes} ({difference * 100}%)"
                     await message.reply(answer)
-            response = requests.get("https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
-            for action in person_actions:
-                price, new_price = check(response, action)
-                difference = price - new_price
-                res = ''
-                if difference > 0:
-                    res = '📉'
-                elif difference < 0:
-                    res = '📈'
-                if len(res) > 0:
-                    text = f"{res}{action}: {price} -> {new_price} {res}"
-                    await message.reply(text)
         except:
             print("error")
         await asyncio.sleep(60)
