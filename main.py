@@ -243,6 +243,7 @@ async def process(message):
                 #     await message.reply(mes_v)
                 price, new_price = check(response, action)
                 difference = (abs(price - new_price) * 100) / (price + 0.001) * numpy.sign(-price + new_price)
+                mes = ""
                 if difference > 0:
                     mes = f"🟢#{action}\n"
                 elif difference < 0:
@@ -252,6 +253,7 @@ async def process(message):
                         mes += "Резкое изменения цены\n"
                     else:
                         mes += "Изменение цены\n"
+
                 if len(mes) > 0:
                     answer = f"{mes}{action}: {price} -> {new_price} {mes} ({difference * 100}%)"
                     await message.reply(answer)
