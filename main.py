@@ -16,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 import requests
 import json
 
-import yfinance
+import datetime
 import math
 import numpy
 
@@ -59,11 +59,20 @@ class Companies(Base):
 
 
 def put_companies_to_table():
-    companies_list = [("YANDX", 243),
+    companies_list = [("YNDX", 0),
                       ("ABRA", 0),
-                      ("CHKZ", 23),
-                      ("HIMCP", 57),
-                      ("MTLR", 129)]
+                      ("CHKZ", 0),
+                      ("HIMCP", 0),
+                      ("MTLR", 0),
+                      ("ALRS", 0),
+                      ("GAZP", 0),
+                      ("LKOH", 0),
+                      ("MGNT", 0),
+                      ("NLMK", 0),
+                      ("NVTK", 0),
+                      ("ROSN", 0),
+                      ("SBER", 0),
+                      ]
     items_dicts = []
     for item in companies_list:
         d = {'name': item[0], 'price': 0, 'index': item[1]}
@@ -182,14 +191,13 @@ async def choose_company(message, state):
 
 def get_price(response, name):
     answer = json.loads(response.text)
-    index = session.query(Companies).filter_by(Name=name).first().Index
-    price_active = 22
-    return answer["securities"]["data"][index][price_active]
+    last_price = answer['marketdata']['data'][0][2]
+    return last_price
 
-# def get_volume(ticker):
-#     stock_info = yfinance.Ticker(ticker)
-#     volume = stock_info.fast_info
-#     return volume
+def get_volume(response):
+    answer = json.loads(response.text)
+    last_volume = answer['marketdata']['data'][0][28]
+    return last_volume
 
 def check(response, name):
     new_price = get_price(response, name)
@@ -231,35 +239,28 @@ async def process(message):
     await message.answer('\n'.join(person_actions), reply_markup=buttons)
     while not_stop:
         try:
-            response = requests.get(
-                "https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350")
             for action in person_actions:
-                # volume = get_volume(action)
-                # last_volume = 0
-                # difference_v = (abs(volume - last_volume) * 100) / (volume + 0.001)
-                # if (abs(difference_v) > 0.05):
-                #     last_volume = volume
-                #     mes_v = "🟢Резкое увеличение объема"
-                #     await message.reply(mes_v)
+                response = requests.get(
+                    f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
                 price, new_price = check(response, action)
-                difference = (abs(price - new_price) * 100) / (price + 0.001) * numpy.sign(-price + new_price)
+                volume = get_volume(response)
+                if price == 0:
+                    difference = 0
+                else:
+                    difference = abs((1 - (new_price/(price)))) * numpy.sign(-price + new_price)
                 mes = ""
                 if difference > 0:
                     mes = f"🟢#{action}\n"
                 elif difference < 0:
                     mes = f"🔴#{action}\n"
-                if abs(difference) > 0.005:
-                    if abs(difference) > 0.01:
-                        mes += "Резкое изменения цены\n"
-                    else:
-                        mes += "Изменение цены\n"
-
                 if len(mes) > 0:
-                    answer = f"{mes}{action}: {price} -> {new_price} {mes} ({difference * 100}%)"
+                    now = datetime.datetime.now()
+                    formatted_date = now.strftime("%H:%M %d.%m.%Y")
+                    answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nОбъем: {volume} руб.\n{formatted_date}"
                     await message.reply(answer)
         except:
             print("error")
-        await asyncio.sleep(60)
+        await asyncio.sleep(5)
 
 
 if __name__ == "__main__":
