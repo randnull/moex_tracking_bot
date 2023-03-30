@@ -196,10 +196,12 @@ def get_price(response, name):
     last_price = answer['marketdata']['data'][0][2]
     return last_price
 
+
 def get_volume(response):
     answer = json.loads(response.text)
     last_volume = answer['marketdata']['data'][0][28]
     return last_volume
+
 
 def check(response, name):
     new_price = get_price(response, name)
@@ -207,7 +209,10 @@ def check(response, name):
     price = company.Price
     index = company.Index
     volume = company.Volume
-    ret_val = (price - new_price)
+    if new_price is None:
+        ret_val = 0
+    else:
+        ret_val = (price - new_price)
     if abs(ret_val) > 0:
         db = sqlite3.connect('database.db')
         sql = db.cursor()
