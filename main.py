@@ -53,6 +53,7 @@ class Companies(Base):
     Name = Column(String, name='Name', primary_key=True)
     Price = Column(Integer, name='Price')
     Index = Column(Integer, name='Index')
+    Volume = Column(Integer, name='Volume')
 
     def __repr__(self):
         return f"{self.Name}"
@@ -75,7 +76,7 @@ def put_companies_to_table():
                       ]
     items_dicts = []
     for item in companies_list:
-        d = {'name': item[0], 'price': 0, 'index': item[1]}
+        d = {'name': item[0], 'price': 0, 'index': item[1], 'volume': 0}
         items_dicts.append(d)
     db = sqlite3.connect('database.db')
     sql = db.cursor()
@@ -83,7 +84,8 @@ def put_companies_to_table():
         name = item['name']
         price = item['price']
         index = item['index']
-        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index") VALUES (?, ?, ?)', (name, price, index))
+        volume = item['volume']
+        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)', (name, price, index, volume))
     db.commit()
 
 
@@ -204,11 +206,12 @@ def check(response, name):
     company = session.query(Companies).filter_by(Name=name).first()
     price = company.Price
     index = company.Index
+    volume = company.Volume
     ret_val = (price - new_price)
     if abs(ret_val) > 0:
         db = sqlite3.connect('database.db')
         sql = db.cursor()
-        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index") VALUES (?, ?, ?)', (name, new_price, index))
+        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)', (name, new_price, index, volume))
         db.commit()
         session.commit()
     return price, new_price
@@ -238,28 +241,28 @@ async def process(message):
     buttons.add(create)
     await message.answer('\n'.join(person_actions), reply_markup=buttons)
     while not_stop:
-        try:
-            for action in person_actions:
-                response = requests.get(
-                    f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
-                price, new_price = check(response, action)
-                volume = get_volume(response)
-                if price == 0:
-                    difference = 0
-                else:
-                    difference = abs((1 - (new_price/(price)))) * numpy.sign(-price + new_price)
-                mes = ""
-                if difference > 0:
-                    mes = f"🟢#{action}\n"
-                elif difference < 0:
-                    mes = f"🔴#{action}\n"
-                if len(mes) > 0:
-                    now = datetime.datetime.now()
-                    formatted_date = now.strftime("%H:%M %d.%m.%Y")
-                    answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nОбъем: {volume} руб.\n{formatted_date}"
-                    await message.reply(answer)
-        except:
-            print("error")
+        #try:
+        for action in person_actions:
+            response = requests.get(
+                f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
+            price, new_price = check(response, action)
+            volume = get_volume(response)
+            if price == 0:
+                difference = 0
+            else:
+                difference = abs((1 - (new_price/(price)))) * numpy.sign(-price + new_price)
+            mes = ""
+            if difference > 0:
+                mes = f"🟢#{action}\n"
+            elif difference < 0:
+                mes = f"🔴#{action}\n"
+            if len(mes) > 0:
+                now = datetime.datetime.now()
+                formatted_date = now.strftime("%H:%M %d.%m.%Y")
+                answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nОбъем: {volume} руб.\n{formatted_date}"
+                await message.reply(answer)
+        # except:
+        #     print("error")
         await asyncio.sleep(5)
 
 
