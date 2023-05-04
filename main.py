@@ -20,6 +20,8 @@ import datetime
 import math
 import numpy
 
+import emoji
+
 with open("bot_config.toml",  "r",) as config_file:
     config_toml = toml.load(config_file)
     try:
@@ -205,6 +207,7 @@ def get_volume(response):
 
 def check(response, name):
     new_price = get_price(response, name)
+    new_volume = get_volume(response)
     company = session.query(Companies).filter_by(Name=name).first()
     price = company.Price
     index = company.Index
@@ -219,7 +222,18 @@ def check(response, name):
         sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)', (name, new_price, index, volume))
         db.commit()
         session.commit()
-    return price, new_price
+    if new_volume is None:
+        ret_vol = 0
+    else:
+        ret_vol = volume - new_volume
+    if abs(ret_vol) > 0:
+        db = sqlite3.connect('database.db')
+        sql = db.cursor()
+        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)',
+                    (name, new_price, index, new_volume))
+        db.commit()
+        session.commit()
+    return price, new_price, volume, new_volume
 
 
 @dp.message_handler(lambda message: message.text == "Остановить отслеживание", state="*")
@@ -250,21 +264,37 @@ async def process(message):
         for action in person_actions:
             response = requests.get(
                 f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
-            price, new_price = check(response, action)
-            volume = get_volume(response)
+            price, new_price, volume, new_volume = check(response, action)
             if price == 0:
                 difference = 0
             else:
                 difference = abs((1 - (new_price/(price)))) * numpy.sign(-price + new_price)
             mes = ""
             if difference > 0:
-                mes = f"🟢#{action}\n"
+                if abs(difference * 100) > 0.3:
+                    mes = f"{emoji.emojize(':green_circle:')}{emoji.emojize(':green_circle:')}#{action}\n"
+                elif abs(difference * 100) > 0.1:
+                    mes = f"{emoji.emojize(':green_circle:')}#{action}\n"
+                else:
+                    mes = ""
             elif difference < 0:
-                mes = f"🔴#{action}\n"
+                if abs(difference * 100) > 0.3:
+                    mes = f"{emoji.emojize(':red_circle:')}{emoji.emojize(':red_circle:')}#{action}\n"
+                elif abs(difference * 100) > 0.1:
+                    mes = f"{emoji.emojize(':red_circle:')}#{action}\n"
+                else:
+                    mes = ""
+            if volume == 0:
+                difference_volume = 0
+            else:
+                difference_volume = abs((1 - (new_volume/(volume)))) * numpy.sign(-volume + new_volume)
+            if abs(difference_volume * 100) > 0.05:
+                mes += "Замечено изменение объема!\n"
+                mes += f"#{action} Изменения объема: {volume} -> {new_volume} ({(difference_volume * 100):.2f}%)\n"
             if len(mes) > 0:
                 now = datetime.datetime.now()
                 formatted_date = now.strftime("%H:%M %d.%m.%Y")
-                answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nОбъем: {volume} руб.\n{formatted_date}"
+                answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nОбъем: {new_volume} руб.\n{formatted_date}"
                 await message.reply(answer)
         # except:
         #     print("error")
