@@ -213,13 +213,71 @@ def get_analisys(action):
         exchange="MOEX",
         interval=Interval.INTERVAL_15_MINUTES
     )
-    return ans.get_analysis().indicators['RSI'], ans.get_analysis().indicators['Stoch.K']
+    return ans.get_analysis().indicators['RSI'], ans.get_analysis().indicators['CCI20']
 
 def get_price(response, name):
     answer = json.loads(response.text)
     last_price = answer['marketdata']['data'][0][2]
     return last_price
 
+def check_alg(score):
+    recommendetion = ""
+    if score > 0:
+        if score < 15:
+            recommendetion = "BUY"
+        elif score < 25:
+            recommendetion = "STRONG BUY"
+        else:
+            recommendetion = "SUPER STRONG BUY"
+    else:
+        if score > -15:
+            recommendetion = "SELL"
+        elif score > -25:
+            recommendetion = "STRONG SELL"
+        else:
+            recommendetion = "SUPER STRONG SELL"
+    return recommendetion
+
+def alg_sell_buy(action, difference_price, deptht_sell, deptht_buy, rsi):
+    score = 0
+    if difference_price > 0:
+        score += min(int(difference_price * 10), 10)
+    else:
+        score -= min(int(difference_price * 10), 10)
+    print('SCORE', score)
+    if rsi < 50:
+        score += int((100 - rsi) / 10)
+    else:
+        score -= int(rsi / 10)
+    print('SCORE', score)
+    if deptht_buy > deptht_sell:
+        score += int(deptht_buy / 10)
+    else:
+        score -= int(deptht_sell / 10)
+    print('SCORE', score)
+    return check_alg(int(score))
+
+def own_recommendetion(action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci):
+    recommendation = ""
+    if difference_price > 0.2 and deptht_buy > 70 and rsi < 50:
+        if difference_volume > 0.5 and cci < -100:
+            recommendation = "SUPER STRONG BUY"
+        elif difference_volume > 0.3:
+            recommendation = "STRONG BUY"
+        elif difference_volume > 0.1:
+            recommendation = "BUY"
+    if difference_price > 0.1 and difference_price < 0.2 and deptht_buy > 60 and rsi < 40:
+        recommendation = "BUY"
+    if difference_price < -0.1 and difference_price > -0.2 and deptht_sell > 60 and rsi > 50:
+        recommendation = "SELL"
+    if difference_price < -0.2 and deptht_sell > 70 and rsi > 60:
+        if difference_volume > 0.5 and cci > 100:
+            recommendation = "SUPER STRONG SELL"
+        elif difference_volume > 0.3:
+            recommendation = "STRONG SELL"
+        elif difference_volume > 0.1:
+            recommendation = "SELL"
+    return recommendation
 
 def get_volume(response):
     answer = json.loads(response.text)
@@ -338,8 +396,12 @@ async def process(message):
                 difference_volume = 0
             else:
                 difference_volume = abs((1 - (new_volume/(volume)))) * numpy.sign(-volume + new_volume)
-            st_b_pr = st_b / (st_b + st_s) * 100
-            st_s_pr = st_s / (st_b + st_s) * 100
+            try:
+                st_b_pr = st_b / (st_b + st_s) * 100
+                st_s_pr = st_s / (st_b + st_s) * 100
+            except:
+                st_s_pr = 0
+                st_b_pr = 0
             if (st_b_pr > 85):
                 mes += f"{emoji.emojize(':green_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
             if (st_s_pr > 85):
@@ -349,12 +411,19 @@ async def process(message):
                 mes += f"#{action} Изменения объема: {volume} -> {new_volume} ({(difference_volume * 100):.2f}%)\n"
             if len(mes) > 0:
                 r, s = get_analisys(action)
-                mes += f"\n\nТех. индикаторы: RSI: {r}, Stoch.K: {s}\n\n"
+                mes += f"\n\nТех. индикаторы: RSI: {r}, CCI: {s}\n\n"
             if len(mes) > 0:
                 now = datetime.datetime.now()
                 formatted_date = now.strftime("%H:%M %d.%m.%Y")
                 answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nАктуальный стакан:\nПокупка: {st_b_pr:.2f}% Продажа: {st_s_pr:.2f}%\nОбъем: {new_volume} руб.\n{formatted_date}"
-                answer += f"\nПоказатели индикаторов: {get_opinion(action)}"
+                answer += f"\nПоказатели индикаторов: {get_opinion(action)}\n"
+                r, s = get_analisys(action)
+                f_answer = own_recommendetion(action, difference, difference_volume, st_s_pr, st_b_pr, r, s)
+                s_answer = alg_sell_buy(action, difference, st_s_pr, st_b_pr, r)
+                if f_answer != "":
+                    answer += f"По анализу(1): {f_answer}\n"
+                if s_answer != "":
+                    answer += f"По анализу(2): {s_answer}"
                 await message.reply(answer)
         # except:
         #     print("error")
