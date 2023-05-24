@@ -28,7 +28,7 @@ with open("bot_config.toml",  "r",) as config_file:
         token: str = config_toml["bot"]["token"]
     except Exception:
         raise AttributeError('Config file does not have token properly defined.')
-
+#теоритическая справка
 bot = Bot(token=token)
 url_moex = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350'
 dp = Dispatcher(bot, storage=MemoryStorage())
@@ -41,6 +41,7 @@ session = Session()
 
 not_stop = True
 
+dict_rus_names = dict()
 
 class Persons(Base):
     __tablename__ = 'persons'
@@ -60,22 +61,19 @@ class Companies(Base):
     def __repr__(self):
         return f"{self.Name}"
 
+def get_all_companies():
+    global dict_rus_names
+
+    companies_list = []
+    response = requests.get(url_moex)
+    data = json.loads(response.text)
+    for i in data['securities']['data']:
+        companies_list.append((i[0], 0))
+        dict_rus_names[i[0]] = i[2]
+    return companies_list
 
 def put_companies_to_table():
-    companies_list = [("YNDX", 0),
-                      ("ABRA", 0),
-                      ("CHKZ", 0),
-                      ("HIMCP", 0),
-                      ("MTLR", 0),
-                      ("ALRS", 0),
-                      ("GAZP", 0),
-                      ("LKOH", 0),
-                      ("MGNT", 0),
-                      ("NLMK", 0),
-                      ("NVTK", 0),
-                      ("ROSN", 0),
-                      ("SBER", 0),
-                      ]
+    companies_list = get_all_companies()
     items_dicts = []
     for item in companies_list:
         d = {'name': item[0], 'price': 0, 'index': item[1], 'volume': 0}
@@ -123,7 +121,7 @@ async def help(message):
 
 @dp.message_handler(lambda message: message.text == "Изменить акции для отслеживания", state="*")
 async def choose_action(message):
-    global not_stop
+    global not_stop, dict_rus_names
     not_stop = False
     await message.answer("Вы остановили отслеживание. Для получения списка команд нажмите /help")
     await Actions.ChooseCompany.set()
@@ -139,12 +137,16 @@ async def choose_action(message):
     await message.answer('Доступные для отслеживания акции:')
     all_actions = ''
     for r in companies:
-        all_actions += str(r)
+        try:
+            all_actions += str(r) + str("  ") + str(dict_rus_names[str(r)])
+        except:
+            all_actions += str(r)
         all_actions += '\n'
     await message.answer(all_actions)
     await message.answer("Вы можете:\n"
                          "Ввести акцию из списка ваших акций, если хотите удалить ее из вашего списка отслеживания.\n"
-                         "Ввести акцию из списка доступных акций, если хотите добавить ее в ваш список отслеживания.")
+                         "Ввести акцию из списка доступных акций, если хотите добавить ее в ваш список отслеживания.\n"
+                         "Вводу подлежит только тикер акции, например: YNDX.")
 
 
 @dp.message_handler(state=Actions.ChooseCompany)
@@ -204,6 +206,22 @@ def get_volume(response):
     last_volume = answer['marketdata']['data'][0][28]
     return last_volume
 
+def get_glass(response):
+    answer = json.loads(response.text)
+    st_b = answer['marketdata']['data'][0][7]
+    st_s = answer['marketdata']['data'][0][8]
+    all_st = answer['marketdata']['data'][0][5]
+    return st_b, st_s, all_st
+
+def day_change(response):
+    answer = json.loads(response.text)
+    last_volume = answer['marketdata']['data'][0][40]
+    return last_volume
+
+def get_SPREAD(response):
+    answer = json.loads(response.text)
+    spread = answer['marketdata']['data'][0][6]
+    return spread
 
 def check(response, name):
     new_price = get_price(response, name)
@@ -242,6 +260,7 @@ async def stop(message, state):
     not_stop = False
     await message.answer("Вы остановили отслеживание. Для получения списка команд нажмите /help")
 
+#ручная настройка цены/объема
 
 @dp.message_handler(lambda message: message.text == "Перейти к отслеживанию", state="*")
 async def process(message):
@@ -265,6 +284,8 @@ async def process(message):
             response = requests.get(
                 f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
             price, new_price, volume, new_volume = check(response, action)
+            day_change_ = day_change(response)
+            st_b, st_s, all_st = get_glass(response)
             if price == 0:
                 difference = 0
             else:
@@ -272,29 +293,35 @@ async def process(message):
             mes = ""
             if difference > 0:
                 if abs(difference * 100) > 0.3:
-                    mes = f"{emoji.emojize(':green_circle:')}{emoji.emojize(':green_circle:')}#{action}\n"
-                elif abs(difference * 100) > 0.1:
-                    mes = f"{emoji.emojize(':green_circle:')}#{action}\n"
+                    mes = f"{emoji.emojize(':green_circle:')}{emoji.emojize(':green_circle:')}#{action}\nЗамечено изменение цены!\n"
+                elif abs(difference * 100) > 0.01:
+                    mes = f"{emoji.emojize(':green_circle:')}#{action}\nЗамечено изменение цены!\n"
                 else:
                     mes = ""
             elif difference < 0:
                 if abs(difference * 100) > 0.3:
-                    mes = f"{emoji.emojize(':red_circle:')}{emoji.emojize(':red_circle:')}#{action}\n"
-                elif abs(difference * 100) > 0.1:
-                    mes = f"{emoji.emojize(':red_circle:')}#{action}\n"
+                    mes = f"{emoji.emojize(':red_circle:')}{emoji.emojize(':red_circle:')}#{action}\nЗамечено изменение цены!\n"
+                elif abs(difference * 100) > 0.01:
+                    mes = f"{emoji.emojize(':red_circle:')}#{action}\nЗамечено изменение цены!\n"
                 else:
                     mes = ""
             if volume == 0:
                 difference_volume = 0
             else:
                 difference_volume = abs((1 - (new_volume/(volume)))) * numpy.sign(-volume + new_volume)
+            st_b_pr = st_b / (st_b + st_s) * 100
+            st_s_pr = st_s / (st_b + st_s) * 100
+            if (st_b_pr > 85):
+                mes += f"{emoji.emojize(':green_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
+            if (st_s_pr > 85):
+                mes += f"{emoji.emojize(':red_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
             if abs(difference_volume * 100) > 0.05:
                 mes += "Замечено изменение объема!\n"
                 mes += f"#{action} Изменения объема: {volume} -> {new_volume} ({(difference_volume * 100):.2f}%)\n"
             if len(mes) > 0:
                 now = datetime.datetime.now()
                 formatted_date = now.strftime("%H:%M %d.%m.%Y")
-                answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nОбъем: {new_volume} руб.\n{formatted_date}"
+                answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nДневное измнение цены: {day_change_}%\nАктуальный стакан:\nПокупка: {st_b_pr:.2f}% Продажа: {st_s_pr:.2f}%\nОбъем: {new_volume} руб.\n{formatted_date}"
                 await message.reply(answer)
         # except:
         #     print("error")
