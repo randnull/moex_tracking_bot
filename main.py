@@ -244,17 +244,14 @@ def alg_sell_buy(action, difference_price, deptht_sell, deptht_buy, rsi):
         score += min(int(difference_price * 10), 10)
     else:
         score -= min(int(difference_price * 10), 10)
-    print('SCORE', score)
     if rsi < 50:
         score += int((100 - rsi) / 10)
     else:
         score -= int(rsi / 10)
-    print('SCORE', score)
     if deptht_buy > deptht_sell:
         score += int(deptht_buy / 10)
     else:
         score -= int(deptht_sell / 10)
-    print('SCORE', score)
     return check_alg(int(score))
 
 def own_recommendetion(action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci):
@@ -366,67 +363,67 @@ async def process(message):
     buttons.add(create)
     await message.answer('\n'.join(person_actions), reply_markup=buttons)
     while not_stop:
-        #try:
-        for action in person_actions:
-            response = requests.get(
-                f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
-            price, new_price, volume, new_volume = check(response, action)
-            day_change_ = day_change(response)
-            st_b, st_s, all_st = get_glass(response)
-            if price == 0:
-                difference = 0
-            else:
-                difference = abs((1 - (new_price/(price)))) * numpy.sign(-price + new_price)
-            mes = ""
-            if difference > 0:
-                if abs(difference * 100) > 0.3:
-                    mes = f"{emoji.emojize(':green_circle:')}{emoji.emojize(':green_circle:')}#{action}\nЗамечено изменение цены!\n"
-                elif abs(difference * 100) > 0.1:
-                    mes = f"{emoji.emojize(':green_circle:')}#{action}\nЗамечено изменение цены!\n"
+        try:
+            for action in person_actions:
+                response = requests.get(
+                    f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
+                price, new_price, volume, new_volume = check(response, action)
+                day_change_ = day_change(response)
+                st_b, st_s, all_st = get_glass(response)
+                if price == 0:
+                    difference = 0
                 else:
-                    mes = ""
-            elif difference < 0:
-                if abs(difference * 100) > 0.3:
-                    mes = f"{emoji.emojize(':red_circle:')}{emoji.emojize(':red_circle:')}#{action}\nЗамечено изменение цены!\n"
-                elif abs(difference * 100) > 0.1:
-                    mes = f"{emoji.emojize(':red_circle:')}#{action}\nЗамечено изменение цены!\n"
+                    difference = abs((1 - (new_price/(price)))) * numpy.sign(-price + new_price)
+                mes = ""
+                if difference > 0:
+                    if abs(difference * 100) > 0.3:
+                        mes = f"{emoji.emojize(':green_circle:')}{emoji.emojize(':green_circle:')}#{action}\nЗамечено изменение цены!\n"
+                    elif abs(difference * 100) > 0.1:
+                        mes = f"{emoji.emojize(':green_circle:')}#{action}\nЗамечено изменение цены!\n"
+                    else:
+                        mes = ""
+                elif difference < 0:
+                    if abs(difference * 100) > 0.3:
+                        mes = f"{emoji.emojize(':red_circle:')}{emoji.emojize(':red_circle:')}#{action}\nЗамечено изменение цены!\n"
+                    elif abs(difference * 100) > 0.1:
+                        mes = f"{emoji.emojize(':red_circle:')}#{action}\nЗамечено изменение цены!\n"
+                    else:
+                        mes = ""
+                if volume == 0:
+                    difference_volume = 0
                 else:
-                    mes = ""
-            if volume == 0:
-                difference_volume = 0
-            else:
-                difference_volume = abs((1 - (new_volume/(volume)))) * numpy.sign(-volume + new_volume)
-            try:
-                st_b_pr = st_b / (st_b + st_s) * 100
-                st_s_pr = st_s / (st_b + st_s) * 100
-            except:
-                st_s_pr = 0
-                st_b_pr = 0
-            if (st_b_pr > 85):
-                mes += f"{emoji.emojize(':green_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
-            if (st_s_pr > 85):
-                mes += f"{emoji.emojize(':red_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
-            if abs(difference_volume * 100) > 0.05:
-                mes += "Замечено изменение объема!\n"
-                mes += f"#{action} Изменения объема: {volume} -> {new_volume} ({(difference_volume * 100):.2f}%)\n"
-            if len(mes) > 0:
-                r, s = get_analisys(action)
-                mes += f"\n\nТех. индикаторы: RSI: {r}, CCI: {s}\n\n"
-            if len(mes) > 0:
-                now = datetime.datetime.now()
-                formatted_date = now.strftime("%H:%M %d.%m.%Y")
-                answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nАктуальный стакан:\nПокупка: {st_b_pr:.2f}% Продажа: {st_s_pr:.2f}%\nОбъем: {new_volume} руб.\n{formatted_date}"
-                answer += f"\nПоказатели индикаторов: {get_opinion(action)}\n"
-                r, s = get_analisys(action)
-                f_answer = own_recommendetion(action, difference, difference_volume, st_s_pr, st_b_pr, r, s)
-                s_answer = alg_sell_buy(action, difference, st_s_pr, st_b_pr, r)
-                if f_answer != "":
-                    answer += f"По анализу(1): {f_answer}\n"
-                if s_answer != "":
-                    answer += f"По анализу(2): {s_answer}"
-                await message.reply(answer)
-        # except:
-        #     print("error")
+                    difference_volume = abs((1 - (new_volume/(volume)))) * numpy.sign(-volume + new_volume)
+                try:
+                    st_b_pr = st_b / (st_b + st_s) * 100
+                    st_s_pr = st_s / (st_b + st_s) * 100
+                except:
+                    st_s_pr = 0
+                    st_b_pr = 0
+                if (st_b_pr > 85):
+                    mes += f"{emoji.emojize(':green_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
+                if (st_s_pr > 85):
+                    mes += f"{emoji.emojize(':red_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
+                if abs(difference_volume * 100) > 0.05:
+                    mes += "Замечено изменение объема!\n"
+                    mes += f"#{action} Изменения объема: {volume} -> {new_volume} ({(difference_volume * 100):.2f}%)\n"
+                if len(mes) > 0:
+                    r, s = get_analisys(action)
+                    mes += f"\n\nТех. индикаторы: RSI: {r}, CCI: {s}\n\n"
+                if len(mes) > 0:
+                    now = datetime.datetime.now()
+                    formatted_date = now.strftime("%H:%M %d.%m.%Y")
+                    answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nАктуальный стакан:\nПокупка: {st_b_pr:.2f}% Продажа: {st_s_pr:.2f}%\nОбъем: {new_volume} руб.\n{formatted_date}"
+                    answer += f"\nПоказатели индикаторов: {get_opinion(action)}\n"
+                    r, s = get_analisys(action)
+                    f_answer = own_recommendetion(action, difference, difference_volume, st_s_pr, st_b_pr, r, s)
+                    s_answer = alg_sell_buy(action, difference, st_s_pr, st_b_pr, r)
+                    if f_answer != "":
+                        answer += f"По анализу(1): {f_answer}\n"
+                    if s_answer != "":
+                        answer += f"По анализу(2): {s_answer}"
+                    await message.reply(answer)
+        except:
+            print("error")
         await asyncio.sleep(10)
 
 
