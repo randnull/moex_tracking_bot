@@ -18,9 +18,12 @@ import json
 
 import datetime
 import math
+
 import numpy
 
 import emoji
+
+from tradingview_ta import TA_Handler, Interval, Exchange
 
 with open("bot_config.toml",  "r",) as config_file:
     config_toml = toml.load(config_file)
@@ -28,7 +31,7 @@ with open("bot_config.toml",  "r",) as config_file:
         token: str = config_toml["bot"]["token"]
     except Exception:
         raise AttributeError('Config file does not have token properly defined.')
-#теоритическая справка
+
 bot = Bot(token=token)
 url_moex = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities.json?first=350'
 dp = Dispatcher(bot, storage=MemoryStorage())
@@ -194,6 +197,23 @@ async def choose_company(message, state):
         await message.answer("Акции, которые вы отслеживаете:")
         await message.answer('\n'.join(person_actions))
 
+def get_opinion(action):
+    ans = TA_Handler(
+        symbol=action,
+        screener="russia",
+        exchange="MOEX",
+        interval=Interval.INTERVAL_15_MINUTES
+    )
+    return ans.get_analysis().summary['RECOMMENDATION']
+
+def get_analisys(action):
+    ans = TA_Handler(
+        symbol=action,
+        screener="russia",
+        exchange="MOEX",
+        interval=Interval.INTERVAL_15_MINUTES
+    )
+    return ans.get_analysis().indicators['RSI'], ans.get_analysis().indicators['Stoch.K']
 
 def get_price(response, name):
     answer = json.loads(response.text)
@@ -215,8 +235,8 @@ def get_glass(response):
 
 def day_change(response):
     answer = json.loads(response.text)
-    last_volume = answer['marketdata']['data'][0][40]
-    return last_volume
+    last_close_price = answer['marketdata']['data'][0][21]
+    return last_close_price
 
 def get_SPREAD(response):
     answer = json.loads(response.text)
@@ -230,21 +250,33 @@ def check(response, name):
     price = company.Price
     index = company.Index
     volume = company.Volume
+    difference = 0
     if new_price is None:
         ret_val = 0
+        difference = 0
     else:
+        if price == 0:
+            difference = 0
+        else:
+            difference = abs((1 - (new_price / (price))))
         ret_val = (price - new_price)
-    if abs(ret_val) > 0:
+    if abs(ret_val) > 0 and abs(difference) > 0.1:
         db = sqlite3.connect('database.db')
         sql = db.cursor()
         sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)', (name, new_price, index, volume))
         db.commit()
         session.commit()
+    difference_volume = 0
     if new_volume is None:
         ret_vol = 0
+        difference_volume = 0
     else:
         ret_vol = volume - new_volume
-    if abs(ret_vol) > 0:
+        if volume == 0:
+            difference_volume = 0
+        else:
+            difference_volume = abs((1 - (new_volume / (volume))))
+    if abs(ret_vol) > 0 and abs(difference_volume) > 0.05:
         db = sqlite3.connect('database.db')
         sql = db.cursor()
         sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)',
@@ -253,14 +285,11 @@ def check(response, name):
         session.commit()
     return price, new_price, volume, new_volume
 
-
 @dp.message_handler(lambda message: message.text == "Остановить отслеживание", state="*")
 async def stop(message, state):
     global not_stop
     not_stop = False
     await message.answer("Вы остановили отслеживание. Для получения списка команд нажмите /help")
-
-#ручная настройка цены/объема
 
 @dp.message_handler(lambda message: message.text == "Перейти к отслеживанию", state="*")
 async def process(message):
@@ -294,14 +323,14 @@ async def process(message):
             if difference > 0:
                 if abs(difference * 100) > 0.3:
                     mes = f"{emoji.emojize(':green_circle:')}{emoji.emojize(':green_circle:')}#{action}\nЗамечено изменение цены!\n"
-                elif abs(difference * 100) > 0.01:
+                elif abs(difference * 100) > 0.1:
                     mes = f"{emoji.emojize(':green_circle:')}#{action}\nЗамечено изменение цены!\n"
                 else:
                     mes = ""
             elif difference < 0:
                 if abs(difference * 100) > 0.3:
                     mes = f"{emoji.emojize(':red_circle:')}{emoji.emojize(':red_circle:')}#{action}\nЗамечено изменение цены!\n"
-                elif abs(difference * 100) > 0.01:
+                elif abs(difference * 100) > 0.1:
                     mes = f"{emoji.emojize(':red_circle:')}#{action}\nЗамечено изменение цены!\n"
                 else:
                     mes = ""
@@ -319,13 +348,17 @@ async def process(message):
                 mes += "Замечено изменение объема!\n"
                 mes += f"#{action} Изменения объема: {volume} -> {new_volume} ({(difference_volume * 100):.2f}%)\n"
             if len(mes) > 0:
+                r, s = get_analisys(action)
+                mes += f"\n\nТех. индикаторы: RSI: {r}, Stoch.K: {s}\n\n"
+            if len(mes) > 0:
                 now = datetime.datetime.now()
                 formatted_date = now.strftime("%H:%M %d.%m.%Y")
-                answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nДневное измнение цены: {day_change_}%\nАктуальный стакан:\nПокупка: {st_b_pr:.2f}% Продажа: {st_s_pr:.2f}%\nОбъем: {new_volume} руб.\n{formatted_date}"
+                answer = f"{mes}{action}: {price} -> {new_price} ({(difference * 100):.2f}%)\nАктуальный стакан:\nПокупка: {st_b_pr:.2f}% Продажа: {st_s_pr:.2f}%\nОбъем: {new_volume} руб.\n{formatted_date}"
+                answer += f"\nПоказатели индикаторов: {get_opinion(action)}"
                 await message.reply(answer)
         # except:
         #     print("error")
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)
 
 
 if __name__ == "__main__":
