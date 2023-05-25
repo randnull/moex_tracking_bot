@@ -60,6 +60,8 @@ class Companies(Base):
     Price = Column(Integer, name='Price')
     Index = Column(Integer, name='Index')
     Volume = Column(Integer, name='Volume')
+    Deepth = Column(Integer, name='Deepth')
+    PrevPrices = Column(String, name='PrevPrices')
 
     def __repr__(self):
         return f"{self.Name}"
@@ -79,7 +81,7 @@ def put_companies_to_table():
     companies_list = get_all_companies()
     items_dicts = []
     for item in companies_list:
-        d = {'name': item[0], 'price': 0, 'index': item[1], 'volume': 0}
+        d = {'name': item[0], 'price': 0, 'index': item[1], 'volume': 0, 'deepth': 0, 'prevPrices': ''}
         items_dicts.append(d)
     db = sqlite3.connect('database.db')
     sql = db.cursor()
@@ -88,7 +90,10 @@ def put_companies_to_table():
         price = item['price']
         index = item['index']
         volume = item['volume']
-        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)', (name, price, index, volume))
+        deepth = item['deepth']
+        prevPrices = item['prevPrices']
+        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume", "Deepth", "PrevPrices") VALUES (?, ?, ?, ?, ?, ?)', (name, price,
+                                                                                                                            index, volume, deepth, prevPrices))
     db.commit()
 
 
@@ -305,6 +310,8 @@ def check(response, name):
     price = company.Price
     index = company.Index
     volume = company.Volume
+    deepth = company.Deepth
+    prevPrices = company.PrevPrices
     difference = 0
     if new_price is None:
         ret_val = 0
@@ -316,9 +323,17 @@ def check(response, name):
             difference = abs((1 - (new_price / (price))))
         ret_val = (price - new_price)
     if abs(ret_val) > 0 and abs(difference) > 0.1:
+        prevPricesList = prevPrices.split()
+        if len(prevPricesList) < 10:
+            prevPrices.append(new_price)
+        else:
+            prevPrices.append(new_price)
+            prevPrices = prevPrices[1:]
+        prevPrices = " ".join(prevPricesList)
         db = sqlite3.connect('database.db')
         sql = db.cursor()
-        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)', (name, new_price, index, volume))
+        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume", "Deepth", "PrevPrices") VALUES (?, ?, ?, ?, ?, ?)', (name,
+                                                                                                             new_price, index, volume, deepth, prevPrices))
         db.commit()
         session.commit()
     difference_volume = 0
@@ -334,8 +349,8 @@ def check(response, name):
     if abs(ret_vol) > 0 and abs(difference_volume) > 0.05:
         db = sqlite3.connect('database.db')
         sql = db.cursor()
-        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume") VALUES (?, ?, ?, ?)',
-                    (name, new_price, index, new_volume))
+        sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume", "Deepth", "PrevPrices") VALUES (?, ?, ?, ?, ?, ?)',
+                    (name, new_price, index, new_volume, deepth, prevPrices))
         db.commit()
         session.commit()
     return price, new_price, volume, new_volume
