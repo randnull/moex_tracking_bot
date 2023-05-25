@@ -1,5 +1,6 @@
 import asyncio
 
+import numpy
 import toml
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -150,7 +151,7 @@ async def choose_action(message):
     await message.answer(all_actions)
     await message.answer("Вы можете:\n"
                          "Ввести акцию из списка ваших акций, если хотите удалить ее из вашего списка отслеживания.\n"
-                         "Ввести акцию из списка доступных акций, если хотите добавить ее в ваш список отслеживания.\n"
+                         "Ввести акцию/акции через пробел из списка доступных акций, если хотите добавить ее в ваш список отслеживания.\n"
                          "Вводу подлежит только тикер акции, например: YNDX.")
 
 
@@ -165,39 +166,41 @@ async def choose_company(message, state):
     create = KeyboardButton("Выйти")
     buttons = ReplyKeyboardMarkup(resize_keyboard=True)
     buttons.add(create)
-    check_name = session.query(Companies).filter_by(Name=mes).all()
-    if len(check_name) == 0:
-        await message.answer("Акций с таким названием не существует. Введите другое название или нажмите Выйти.", reply_markup=buttons)
-    else:
-        companies = session.query(Persons).filter_by(UserID=user_id).first().Companies
-        if companies is None:
-            companies = []
+    mes_list = mes.split()
+    for mes in mes_list:
+        check_name = session.query(Companies).filter_by(Name=mes).all()
+        if len(check_name) == 0:
+            await message.answer("Акций с таким названием не существует. Введите другое название или нажмите Выйти.", reply_markup=buttons)
         else:
-            companies = companies.split()
-        if mes in set(companies):
-            i = companies.index(mes)
-            new_companies = companies[:i] + companies[i + 1:]
-            companies_str = ' '.join(new_companies)
-            db = sqlite3.connect('database.db')
-            sql = db.cursor()
-            sql.execute('INSERT OR REPLACE INTO persons ("UserID", "Companies") VALUES (?, ?)', (user_id, companies_str))
-            db.commit()
-            session.commit()
-            await message.answer("Акция успешно удалена. Введите название другой акции, которую хотите добавить/удалить, или нажмите Выйти.",
-                                 reply_markup=buttons)
-        else:
-            companies.append(mes)
-            companies_str = ' '.join(companies)
-            db = sqlite3.connect('database.db')
-            sql = db.cursor()
-            sql.execute('INSERT OR REPLACE INTO persons ("UserID", "Companies") VALUES (?, ?)', (user_id, companies_str))
-            db.commit()
-            session.commit()
-            await message.answer("Акция успешно добавлена. Введите название другой акции, которую хотите добавить/удалить, или нажмите Выйти.",
-                                 reply_markup=buttons)
-        person_actions = session.query(Persons).filter_by(UserID=user_id).first().Companies.split()
-        await message.answer("Акции, которые вы отслеживаете:")
-        await message.answer('\n'.join(person_actions))
+            companies = session.query(Persons).filter_by(UserID=user_id).first().Companies
+            if companies is None:
+                companies = []
+            else:
+                companies = companies.split()
+            if mes in set(companies):
+                i = companies.index(mes)
+                new_companies = companies[:i] + companies[i + 1:]
+                companies_str = ' '.join(new_companies)
+                db = sqlite3.connect('database.db')
+                sql = db.cursor()
+                sql.execute('INSERT OR REPLACE INTO persons ("UserID", "Companies") VALUES (?, ?)', (user_id, companies_str))
+                db.commit()
+                session.commit()
+                await message.answer("Акция успешно удалена. Введите название другой акции, которую хотите добавить/удалить, или нажмите Выйти.",
+                                     reply_markup=buttons)
+            else:
+                companies.append(mes)
+                companies_str = ' '.join(companies)
+                db = sqlite3.connect('database.db')
+                sql = db.cursor()
+                sql.execute('INSERT OR REPLACE INTO persons ("UserID", "Companies") VALUES (?, ?)', (user_id, companies_str))
+                db.commit()
+                session.commit()
+                await message.answer("Акция успешно добавлена. Введите название другой акции, которую хотите добавить/удалить, или нажмите Выйти.",
+                                     reply_markup=buttons)
+            person_actions = session.query(Persons).filter_by(UserID=user_id).first().Companies.split()
+            await message.answer("Акции, которые вы отслеживаете:")
+            await message.answer('\n'.join(person_actions))
 
 def get_opinion(action):
     ans = TA_Handler(

@@ -27,13 +27,13 @@ class TestBot(unittest.TestCase):
             self.assertEqual(companies_list, expected)
 
     def test_check_alg(self):
-        test_cases = [(30, 'SUPER STRONG BUY'),  (0, 'SELL'), (10, 'BUY'), (-20, 'STRONG SELL')]
+        test_cases = [(30, 'SUPER STRONG BUY'),  (0, 'SELL'), (10, 'STRONG BUY'), (-20, 'STRONG SELL')]
         for price, expected in test_cases:
             result = check_alg(price)
             assert result == expected, f"Expected: {expected}, Got: {result}"
 
     def test_alg_sell_buy(self):
-        difference_price, deptht_sell, deptht_buy, rsi, expected = 0.9, 0, 100, 60, 'BUY'
+        difference_price, deptht_sell, deptht_buy, rsi, expected = 0.9, 0, 100, 60, 'STRONG BUY'
         result = alg_sell_buy('YNDX', difference_price, deptht_sell, deptht_buy, rsi)
         assert result == expected, f"Expected: {expected}, Got: {result}"
 
