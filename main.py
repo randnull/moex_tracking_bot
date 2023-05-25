@@ -248,7 +248,7 @@ def alg_sell_buy(action, difference_price, deptht_sell, deptht_buy, rsi):
     if difference_price > 0:
         score += min(int(difference_price * 10), 10)
     else:
-        score -= min(int(difference_price * 10), 10)
+        score -= min(int(abs(difference_price) * 10), 10)
     if rsi < 50:
         score += int((100 - rsi) / 10)
     else:
@@ -261,18 +261,18 @@ def alg_sell_buy(action, difference_price, deptht_sell, deptht_buy, rsi):
 
 def own_recommendetion(action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci):
     recommendation = ""
-    if difference_price > 0.2 and deptht_buy > 70 and rsi < 50:
+    if difference_price > 0.5 and deptht_buy > 70 and rsi < 50:
         if difference_volume > 0.5 and cci < -100:
             recommendation = "SUPER STRONG BUY"
         elif difference_volume > 0.3:
             recommendation = "STRONG BUY"
         elif difference_volume > 0.1:
             recommendation = "BUY"
-    if difference_price > 0.1 and difference_price < 0.2 and deptht_buy > 60 and rsi < 40:
+    if difference_price > 0.3 and difference_price < 0.5 and deptht_buy > 60 and rsi < 40:
         recommendation = "BUY"
-    if difference_price < -0.1 and difference_price > -0.2 and deptht_sell > 60 and rsi > 50:
+    if difference_price < -0.3 and difference_price > -0.5 and deptht_sell > 60 and rsi > 50:
         recommendation = "SELL"
-    if difference_price < -0.2 and deptht_sell > 70 and rsi > 60:
+    if difference_price < -0.5 and deptht_sell > 70 and rsi > 60:
         if difference_volume > 0.5 and cci > 100:
             recommendation = "SUPER STRONG SELL"
         elif difference_volume > 0.3:
@@ -322,13 +322,8 @@ def check(response, name):
         else:
             difference = abs((1 - (new_price / (price))))
         ret_val = (price - new_price)
-    if abs(ret_val) > 0 and abs(difference) > 0.1:
+    if abs(ret_val) > 0:
         prevPricesList = prevPrices.split()
-        if len(prevPricesList) < 10:
-            prevPrices.append(new_price)
-        else:
-            prevPrices.append(new_price)
-            prevPrices = prevPrices[1:]
         prevPrices = " ".join(prevPricesList)
         db = sqlite3.connect('database.db')
         sql = db.cursor()
@@ -346,7 +341,7 @@ def check(response, name):
             difference_volume = 0
         else:
             difference_volume = abs((1 - (new_volume / (volume))))
-    if abs(ret_vol) > 0 and abs(difference_volume) > 0.05:
+    if abs(ret_vol) > 0:
         db = sqlite3.connect('database.db')
         sql = db.cursor()
         sql.execute('INSERT OR REPLACE INTO companies ("Name", "Price", "Index", "Volume", "Deepth", "PrevPrices") VALUES (?, ?, ?, ?, ?, ?)',
@@ -418,7 +413,7 @@ async def process(message):
                     mes += f"{emoji.emojize(':green_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
                 if (st_s_pr > 85):
                     mes += f"{emoji.emojize(':red_circle:')}#{action}\nСтакан несбалансирован!\nОжидается резкое изменение цены\n"
-                if abs(difference_volume * 100) > 0.05:
+                if abs(difference_volume * 100) > 0.5:
                     mes += "Замечено изменение объема!\n"
                     mes += f"#{action} Изменения объема: {volume} -> {new_volume} ({(difference_volume * 100):.2f}%)\n"
                 if len(mes) > 0:
@@ -437,7 +432,8 @@ async def process(message):
                     if s_answer != "":
                         answer += f"По анализу(2): {s_answer}"
                     await message.reply(answer)
-        except:
+        except Exception as ex:
+            print(ex)
             print("error")
         await asyncio.sleep(10)
 

@@ -33,12 +33,12 @@ class TestBot(unittest.TestCase):
             assert result == expected, f"Expected: {expected}, Got: {result}"
 
     def test_alg_sell_buy(self):
-        prices, difference_price, deptht_sell, deptht_buy, rsi, expected = [100, 110, 120, 130, 140], 10, 5, 5, 70, 'BUY'
-        result = alg_sell_buy(prices, difference_price, deptht_sell, deptht_buy, rsi)
+        difference_price, deptht_sell, deptht_buy, rsi, expected = 0.9, 0, 100, 60, 'BUY'
+        result = alg_sell_buy('YNDX', difference_price, deptht_sell, deptht_buy, rsi)
         assert result == expected, f"Expected: {expected}, Got: {result}"
 
     def test_own_recomendation(self):
-        action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci, expected = 100, 0.4, 0.4, 0.4, 100, 20, 5, 'STRONG BUY'
+        action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci, expected = 'YNDX', 0.7, 0.8, 10, 90, 10, -101, 'SUPER STRONG BUY'
         result = own_recommendetion(action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci)
         assert result == expected, f"Expected: {expected}, Got: {result}"
 
