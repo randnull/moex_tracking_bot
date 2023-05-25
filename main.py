@@ -17,9 +17,6 @@ import requests
 import json
 
 import datetime
-import math
-
-import numpy
 
 import emoji
 
@@ -228,16 +225,16 @@ def get_price(response, name):
 def check_alg(score):
     recommendetion = ""
     if score > 0:
-        if score < 15:
+        if score < 10:
             recommendetion = "BUY"
-        elif score < 25:
+        elif score < 23:
             recommendetion = "STRONG BUY"
         else:
             recommendetion = "SUPER STRONG BUY"
     else:
-        if score > -15:
+        if score > -10:
             recommendetion = "SELL"
-        elif score > -25:
+        elif score > -23:
             recommendetion = "STRONG SELL"
         else:
             recommendetion = "SUPER STRONG SELL"
