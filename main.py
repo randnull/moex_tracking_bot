@@ -269,9 +269,9 @@ def own_recommendetion(action, difference_price, difference_volume, deptht_sell,
             recommendation = "BUY"
     if difference_price > 0.3 and difference_price < 0.5 and deptht_buy > 60 and rsi < 40:
         recommendation = "BUY"
-    if difference_price < -0.3 and difference_price > -0.5 and deptht_sell > 60 and rsi > 50:
+    if difference_price < -0.3 and difference_price > -0.5 and deptht_sell > 60 and rsi > 60:
         recommendation = "SELL"
-    if difference_price < -0.5 and deptht_sell > 70 and rsi > 60:
+    if difference_price < -0.5 and deptht_sell > 70 and rsi > 50:
         if difference_volume > 0.5 and cci > 100:
             recommendation = "SUPER STRONG SELL"
         elif difference_volume > 0.3:
