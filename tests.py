@@ -42,5 +42,18 @@ class TestBot(unittest.TestCase):
         result = own_recommendetion(action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci)
         assert result == expected, f"Expected: {expected}, Got: {result}"
 
+    def test_process(self):
+        action = "YNDX"
+        response = requests.get(
+            f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
+        assert response.status_code == 200, f"Expected: {200}, Got: {response.status_code}"
+
+    def test_check(self):
+        action = "YNDX"
+        response = requests.get(
+            f"https://iss.moex.com/iss/engines/stock/markets/shares/boards/tqbr/securities/{action}.json")
+        assert response.status_code == 200
+        assert len(check(response, action)) == 4, f"Expected: {4}, Got: {len(check(response, action))}"
+
 if __name__ == '__main__':
     unittest.main()

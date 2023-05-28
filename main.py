@@ -281,6 +281,11 @@ def own_recommendetion(action, difference_price, difference_volume, deptht_sell,
             recommendation = "SELL"
     return recommendation
 
+def sign(x):
+    if x >= 0:
+        return 1
+    return 0
+
 def get_volume(response):
     answer = json.loads(response.text)
     last_volume = answer['marketdata']['data'][0][28]
@@ -383,7 +388,7 @@ async def process(message):
                 if price == 0:
                     difference = 0
                 else:
-                    difference = abs((1 - (new_price/(price)))) * numpy.sign(-price + new_price)
+                    difference = abs((1 - (new_price/(price)))) * sign(-price + new_price)
                 mes = ""
                 if difference > 0:
                     if abs(difference * 100) > 0.3:
@@ -402,7 +407,7 @@ async def process(message):
                 if volume == 0:
                     difference_volume = 0
                 else:
-                    difference_volume = abs((1 - (new_volume/(volume)))) * numpy.sign(-volume + new_volume)
+                    difference_volume = abs((1 - (new_volume/(volume)))) * sign(-volume + new_volume)
                 try:
                     st_b_pr = st_b / (st_b + st_s) * 100
                     st_s_pr = st_s / (st_b + st_s) * 100
