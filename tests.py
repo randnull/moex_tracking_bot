@@ -37,6 +37,14 @@ class TestBot(unittest.TestCase):
         result = alg_sell_buy('YNDX', difference_price, deptht_sell, deptht_buy, rsi)
         assert result == expected, f"Expected: {expected}, Got: {result}"
 
+        difference_price, deptht_sell, deptht_buy, rsi, expected = 0.4, 0, 100, 60, 'BUY'
+        result = alg_sell_buy('YNDX', difference_price, deptht_sell, deptht_buy, rsi)
+        assert result == expected, f"Expected: {expected}, Got: {result}"
+
+        difference_price, deptht_sell, deptht_buy, rsi, expected = 0.1, 100, 100, 60, 'STRONG SELL'
+        result = alg_sell_buy('YNDX', difference_price, deptht_sell, deptht_buy, rsi)
+        assert result == expected, f"Expected: {expected}, Got: {result}"
+
     def test_own_recomendation(self):
         action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci, expected = 'YNDX', 0.7, 0.8, 10, 90, 10, -101, 'SUPER STRONG BUY'
         result = own_recommendetion(action, difference_price, difference_volume, deptht_sell, deptht_buy, rsi, cci)
